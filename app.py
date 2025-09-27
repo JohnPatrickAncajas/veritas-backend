@@ -20,7 +20,7 @@ CORS(app)
 # ------- Config (adjust if needed) -------
 NUM_CLASSES = 2
 CLASS_NAMES = ["Real", "AI"]  # <- update order/names if your training used different labels
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "models", "efficientnet_ai_real_1k.pth")
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "efficientnet_ai_real_1k.pth")
 MODEL_VARIANT = "efficientnet-b0"
 # -----------------------------------------
 

@@ -4,3 +4,4 @@ flask
 flask-cors
 pillow
 gunicorn
+pip>=25.2

@@ -84,11 +84,15 @@ def predict():
             probs = torch.nn.functional.softmax(outputs, dim=1)[0].cpu().numpy().tolist()
             top_idx = int(torch.argmax(outputs, dim=1).item())
             top_prob = float(probs[top_idx])
-        label = CLASS_NAMES[top_idx] if top_idx < len(CLASS_NAMES) else str(top_idx)
+
+        flipped_idx = 1 - top_idx
+        flipped_prob = probs[flipped_idx]
+        label = CLASS_NAMES[flipped_idx]
+
         return jsonify({
-            "class_index": top_idx,
+            "class_index": flipped_idx,
             "class_label": label,
-            "probability": top_prob,
+            "probability": flipped_prob,
             "probs": probs
         })
     except Exception as e:

@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import torch
+torch.set_num_threads(1)
 import torch.nn as nn
 from PIL import Image
 import io
@@ -15,13 +16,12 @@ log = logging.getLogger("veritas-backend")
 
 app = Flask(__name__)
 CORS(app)
+app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024
 
-# ------- Config -------
 NUM_CLASSES = 2
 CLASS_NAMES = ["Real", "AI"]
 MODEL_PATH = os.path.join(os.path.dirname(__file__), "efficientnet_ai_real_1k.pth")
 MODEL_VARIANT = "efficientnet-b0"
-# ----------------------
 
 device = torch.device("cpu")
 log.info(f"Using device: {device}")
@@ -33,27 +33,22 @@ def build_model(num_classes=NUM_CLASSES):
 
 def load_state_dict_strict_safe(model, state_path):
     if not os.path.exists(state_path):
-        raise FileNotFoundError(f"Model file not found: {state_path}")
-
+        log.error(f"Model file not found at {state_path}")
+        raise SystemExit(1)
     raw_state = torch.load(state_path, map_location="cpu")
-
     if isinstance(raw_state, torch.nn.Module):
-        log.warning("Loaded a full model object from file. Returning it directly.")
+        log.warning("Loaded full model object")
         return raw_state
-
     new_state = OrderedDict()
     for k, v in raw_state.items():
         new_key = k.replace("module.", "", 1) if k.startswith("module.") else k
         new_state[new_key] = v
-
     try:
         model.load_state_dict(new_state)
-        log.info("state_dict loaded (strict=True).")
+        log.info("state_dict loaded strict=True")
     except RuntimeError as e:
         log.warning("Strict load failed: %s", e)
-        missing, unexpected = model.load_state_dict(new_state, strict=False)
-        log.warning("Loaded with strict=False. Missing: %s | Unexpected: %s", missing, unexpected)
-
+        model.load_state_dict(new_state, strict=False)
     return model
 
 model = build_model(NUM_CLASSES)
@@ -76,19 +71,19 @@ def root():
 def predict():
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
-
     try:
         file = request.files["file"]
         img_bytes = file.read()
-        image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        try:
+            image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        except Exception:
+            return jsonify({"error": "Invalid image file"}), 400
         input_tensor = transform(image).unsqueeze(0).to(device)
-
         with torch.no_grad():
             outputs = model(input_tensor)
             probs = torch.nn.functional.softmax(outputs, dim=1)[0].cpu().numpy().tolist()
             top_idx = int(torch.argmax(outputs, dim=1).item())
             top_prob = float(probs[top_idx])
-
         label = CLASS_NAMES[top_idx] if top_idx < len(CLASS_NAMES) else str(top_idx)
         return jsonify({
             "class_index": top_idx,

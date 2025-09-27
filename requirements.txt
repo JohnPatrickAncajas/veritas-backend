@@ -1,7 +1,8 @@
-torch
-torchvision
 flask
 flask-cors
+torch
+torchvision
 pillow
+efficientnet_pytorch
 gunicorn
 pip>=25.2

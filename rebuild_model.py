@@ -1,14 +1,42 @@
 import torch
 import torch.nn as nn
 from efficientnet_pytorch import EfficientNet
+from collections import OrderedDict
+from config import MODEL_PATH, MODEL_VARIANT, DEVICE, CLASSES
 
-# Recreate architecture
-num_classes = 2  # same as training
-model = EfficientNet.from_name('efficientnet-b0')
-model._fc = nn.Linear(model._fc.in_features, num_classes)
+NUM_CLASSES = len(CLASSES)
+device = DEVICE
 
-# Load weights
-state_dict = torch.load("efficientnet_ai_real_1k.pth", map_location="cpu")
-model.load_state_dict(state_dict)
+# -------------------------------------------------------
+# Build model
+# -------------------------------------------------------
+model = EfficientNet.from_name(MODEL_VARIANT)
+model._fc = nn.Linear(model._fc.in_features, NUM_CLASSES)
 
+# -------------------------------------------------------
+# Load weights safely
+# -------------------------------------------------------
+raw_state = torch.load(MODEL_PATH, map_location="cpu")
+
+if isinstance(raw_state, torch.nn.Module):
+    print("⚠️ Full model object found (expected state_dict). Using directly.")
+    model = raw_state
+else:
+    new_state = OrderedDict()
+    for k, v in raw_state.items():
+        new_key = k.replace("module.", "", 1) if k.startswith("module.") else k
+        new_state[new_key] = v
+
+    try:
+        model.load_state_dict(new_state, strict=True)
+        print("✅ state_dict loaded successfully (strict=True)")
+    except RuntimeError as e:
+        print(f"⚠️ Strict load failed: {e}")
+        model.load_state_dict(new_state, strict=False)
+        print("✅ state_dict loaded successfully (strict=False)")
+
+# -------------------------------------------------------
+# Eval mode
+# -------------------------------------------------------
 model.eval()
+print("Model ready for inference with 4 classes:", CLASSES)

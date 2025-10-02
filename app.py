@@ -1,7 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import torch
-torch.set_num_threads(1)
 import torch.nn as nn
 from PIL import Image
 import io
@@ -11,58 +10,84 @@ from collections import OrderedDict
 import os
 import logging
 
+# -------------------------------------------------------
+# Logging setup
+# -------------------------------------------------------
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("veritas-backend")
 
+# -------------------------------------------------------
+# Flask app
+# -------------------------------------------------------
 app = Flask(__name__)
 CORS(app)
-app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024  # 2MB max file size
 
-NUM_CLASSES = 2
-CLASS_NAMES = ["Real", "AI"]
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "efficientnet_ai_real_1k.pth")
-MODEL_VARIANT = "efficientnet-b0"
+# -------------------------------------------------------
+# Model config
+# -------------------------------------------------------
+from config import MODEL_PATH, DEVICE, MODEL_VARIANT, CLASSES as CLASS_NAMES
 
-device = torch.device("cpu")
+NUM_CLASSES = len(CLASS_NAMES)
+device = DEVICE
 log.info(f"Using device: {device}")
 
+# -------------------------------------------------------
+# Model helper functions
+# -------------------------------------------------------
 def build_model(num_classes=NUM_CLASSES):
     model = EfficientNet.from_name(MODEL_VARIANT)
     model._fc = nn.Linear(model._fc.in_features, num_classes)
     return model
 
-def load_state_dict_strict_safe(model, state_path):
+def load_state_dict_safe(model, state_path):
     if not os.path.exists(state_path):
         log.error(f"Model file not found at {state_path}")
         raise SystemExit(1)
+
     raw_state = torch.load(state_path, map_location="cpu")
     if isinstance(raw_state, torch.nn.Module):
-        log.warning("Loaded full model object")
+        log.warning("Full model object found (expected state_dict). Using directly.")
         return raw_state
+
     new_state = OrderedDict()
     for k, v in raw_state.items():
         new_key = k.replace("module.", "", 1) if k.startswith("module.") else k
         new_state[new_key] = v
+
     try:
-        model.load_state_dict(new_state)
-        log.info("state_dict loaded strict=True")
+        model.load_state_dict(new_state, strict=True)
+        log.info("state_dict loaded successfully (strict=True)")
     except RuntimeError as e:
-        log.warning("Strict load failed: %s", e)
+        log.warning(f"Strict load failed: {e}")
         model.load_state_dict(new_state, strict=False)
+        log.info("state_dict loaded successfully (strict=False)")
+
     return model
 
+# -------------------------------------------------------
+# Initialize model
+# -------------------------------------------------------
 model = build_model(NUM_CLASSES)
-model = load_state_dict_strict_safe(model, MODEL_PATH)
+model = load_state_dict_safe(model, MODEL_PATH)
 model.to(device)
 model.eval()
+log.info("✅ Model ready for inference")
 
+# -------------------------------------------------------
+# Image preprocessing
+# -------------------------------------------------------
 transform = transforms.Compose([
+    transforms.Lambda(lambda x: x.convert("RGB")),
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
     transforms.Normalize([0.485, 0.456, 0.406],
                          [0.229, 0.224, 0.225])
 ])
 
+# -------------------------------------------------------
+# Routes
+# -------------------------------------------------------
 @app.route("/", methods=["GET"])
 def root():
     return jsonify({"status": "ok", "message": "Veritas backend is running"}), 200
@@ -71,33 +96,46 @@ def root():
 def predict():
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
+
     try:
         file = request.files["file"]
         img_bytes = file.read()
+
+        # Load and validate image
         try:
             image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
         except Exception:
             return jsonify({"error": "Invalid image file"}), 400
+
+        # Preprocess
         input_tensor = transform(image).unsqueeze(0).to(device)
+
+        # Predict
         with torch.no_grad():
             outputs = model(input_tensor)
-            probs = torch.nn.functional.softmax(outputs, dim=1)[0].cpu().numpy().tolist()
-            top_idx = int(torch.argmax(outputs, dim=1).item())
-            top_prob = float(probs[top_idx])
+            probs_tensor = torch.nn.functional.softmax(outputs, dim=1)[0]
+            probs = probs_tensor.cpu().numpy().tolist()
 
-        flipped_idx = 1 - top_idx
-        flipped_prob = probs[flipped_idx]
-        label = CLASS_NAMES[flipped_idx]
+            # Top-1 prediction
+            top_idx = int(torch.argmax(probs_tensor).item())
+            top_prob = float(probs[top_idx])
+            label = CLASS_NAMES[top_idx]
 
         return jsonify({
-            "class_index": flipped_idx,
-            "class_label": label,
-            "probability": flipped_prob,
-            "probs": probs
+            "top1": {
+                "class_index": top_idx,
+                "class_label": label,
+                "probability": top_prob
+            },
+            "all_probs": {cls: float(prob) for cls, prob in zip(CLASS_NAMES, probs)}
         })
+
     except Exception as e:
         log.exception("Prediction error")
         return jsonify({"error": str(e)}), 500
 
+# -------------------------------------------------------
+# Entry
+# -------------------------------------------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=False)

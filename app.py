@@ -66,13 +66,20 @@ def load_state_dict_safe(model, state_path):
     return model
 
 # -------------------------------------------------------
-# Initialize model
+# Lazy-load model
 # -------------------------------------------------------
-model = build_model(NUM_CLASSES)
-model = load_state_dict_safe(model, MODEL_PATH)
-model.to(device)
-model.eval()
-log.info("✅ Model ready for inference")
+model = None  # global placeholder
+
+def get_model():
+    global model
+    if model is None:
+        log.info("🔄 Lazy-loading model...")
+        model = build_model(NUM_CLASSES)
+        model = load_state_dict_safe(model, MODEL_PATH)
+        model.to(device)
+        model.eval()
+        log.info("✅ Model loaded and ready for inference")
+    return model
 
 # -------------------------------------------------------
 # Image preprocessing
@@ -110,9 +117,10 @@ def predict():
         # Preprocess
         input_tensor = transform(image).unsqueeze(0).to(device)
 
-        # Predict
+        # Lazy-load model and predict
+        model_instance = get_model()
         with torch.no_grad():
-            outputs = model(input_tensor)
+            outputs = model_instance(input_tensor)
             probs_tensor = torch.nn.functional.softmax(outputs, dim=1)[0]
             probs = probs_tensor.cpu().numpy().tolist()
 

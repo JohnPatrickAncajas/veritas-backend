@@ -1,0 +1,4 @@
+If you want the repository to stay small and the model files available in deployment:
+
+- Upload the .pt files to object storage (S3, Render Files, GCS) and update your start-up code to download the model into FACE_2D_MODEL_PATH at boot if missing. 
+- This is strongly recommended for large models.

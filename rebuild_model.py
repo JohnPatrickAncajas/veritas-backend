@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from efficientnet_pytorch import EfficientNet
 from collections import OrderedDict
-from config import MODEL_PATH, MODEL_VARIANT, DEVICE, CLASSES
+from config import VERITAS_MODEL_PATH, VERITAS_MODEL_VARIANT, DEVICE, CLASSES
 
 NUM_CLASSES = len(CLASSES)
 device = DEVICE
@@ -10,13 +10,13 @@ device = DEVICE
 # -------------------------------------------------------
 # Build model
 # -------------------------------------------------------
-model = EfficientNet.from_name(MODEL_VARIANT)
+model = EfficientNet.from_name(VERITAS_MODEL_VARIANT)
 model._fc = nn.Linear(model._fc.in_features, NUM_CLASSES)
 
 # -------------------------------------------------------
 # Load weights safely
 # -------------------------------------------------------
-raw_state = torch.load(MODEL_PATH, map_location="cpu")
+raw_state = torch.load(VERITAS_MODEL_PATH, map_location="cpu")
 
 if isinstance(raw_state, torch.nn.Module):
     print("⚠️ Full model object found (expected state_dict). Using directly.")

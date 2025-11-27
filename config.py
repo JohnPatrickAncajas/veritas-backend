@@ -2,10 +2,13 @@ import os
 import torch
 
 # -----------------------------
-# Model path (same folder as config.py / app.py)
+# Model path (models folder)
 # -----------------------------
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "efficientnet_faces.pth")
-MODEL_VARIANT = "efficientnet-b0"
+VERITAS_MODEL_PATH = os.path.join(os.path.dirname(__file__), "models/efficientnet_faces.pth")
+VERITAS_MODEL_VARIANT = "efficientnet-b0"
+
+FACE_2D_MODEL_PATH = os.path.join(os.path.dirname(__file__), "models/yolov5s_anime.pt")
+FACE_2D_MODEL_CONF_THR = 0.4
 
 # -----------------------------
 # Classes

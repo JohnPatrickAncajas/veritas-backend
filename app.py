@@ -14,6 +14,8 @@ import base64
 import numpy as np
 from typing import List, Dict, Any, cast
 from pathlib import Path
+from mtcnn import MTCNN
+from config import HUMAN_FACE_CONF_THR, HUMAN_FACE_DEVICE
 
 
 # -------------------------------------------------------
@@ -139,6 +141,14 @@ def get_face_detector():
     _face_detector_meta = {"type": "yolov5", "names": names}
     return _face_detector, _face_detector_meta
 
+_human_face_detector = None
+
+def get_human_face_detector():
+    global _human_face_detector
+    if _human_face_detector is None:
+        log.info("Loading MTCNN human face detector...")
+        _human_face_detector = MTCNN(device=HUMAN_FACE_DEVICE)
+    return _human_face_detector
 
 def _parse_detection_results(results, meta, conf_thresh=0.4):
     """Return list of detections: dicts with bbox [x1,y1,x2,y2], confidence, class_idx, class_label."""
@@ -336,6 +346,57 @@ def detect_face():
     except Exception as e:
         log.exception("detect_face error")
         return jsonify({"error": str(e)}), 500
+    
+    
+@app.route("/detect_human_face", methods=["POST"])
+def detect_human_face():
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    conf_thresh = float(request.form.get("conf", HUMAN_FACE_CONF_THR))
+
+    try:
+        file = request.files["file"]
+        img_bytes = file.read()
+
+        try:
+            pil_img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        except Exception:
+            return jsonify({"error": "Invalid image file"}), 400
+
+        np_img = np.array(pil_img)
+
+        detector = get_human_face_detector()
+        results = detector.detect_faces(np_img)
+
+        detections = []
+        for r in results:
+            if float(r.get("confidence", 0.0)) < conf_thresh:
+                continue
+            x, y, w, h = r["box"]
+            x = int(x)
+            y = int(y)
+            w = int(w)
+            h = int(h)
+            bbox = [x, y, x + w, y + h]
+            item = {
+                "bbox": bbox,
+                "confidence": float(r.get("confidence", 0.0)),
+                "keypoints": {k: [int(v[0]), int(v[1])] for k, v in (r.get("keypoints", {}) or {}).items()},
+            }
+            item["crop"] = crop_and_encode(pil_img, bbox, fmt="JPEG", q=90)
+            detections.append(item)
+
+        return jsonify({
+            "human_face_present": len(detections) > 0,
+            "count": len(detections),
+            "detections": detections
+        })
+
+    except Exception as e:
+        log.exception("detect_human_face error")
+        return jsonify({"error": str(e)}), 500
+
 
 # -------------------------------------------------------
 # Entry

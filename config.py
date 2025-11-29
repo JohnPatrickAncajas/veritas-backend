@@ -10,6 +10,9 @@ VERITAS_MODEL_VARIANT = "efficientnet-b0"
 FACE_2D_MODEL_PATH = os.path.join(os.path.dirname(__file__), "models/yolov5s_anime.pt")
 FACE_2D_MODEL_CONF_THR = 0.4
 
+HUMAN_FACE_CONF_THR = 0.9     # you can tune this later
+HUMAN_FACE_DEVICE = "CPU:0"   # or "GPU:0" if you use GPU
+
 # -----------------------------
 # Classes
 # -----------------------------

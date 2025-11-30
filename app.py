@@ -29,7 +29,7 @@ log = logging.getLogger("veritas-backend")
 # -------------------------------------------------------
 app = Flask(__name__)
 CORS(app)
-app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024  # 2MB max file size
+app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024  # 2MB max file size
 
 # -------------------------------------------------------
 # Model config

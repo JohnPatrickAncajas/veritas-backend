@@ -21,14 +21,16 @@ import torch
 from typing import Any, cast
 
 BASE = os.environ.get("BASE_URL", "http://localhost:5000")
-
+ 
 def main() -> None:
     # Example: Crop faces from a folder using MTCNN
-    input_folder = r"D:\Programming\ProgrammingProjects\humanoid-classifier\3D_dataset_uncropped"
-    output_folder = r"D:\Programming\ProgrammingProjects\humanoid-classifier\3D_dataset_cropped"
+    input_folder = r"D:\Downloads\celebs"
+    output_folder = r"D:\Downloads\celebs_cropped"
+    
     
     # Try with lower confidence threshold first
-    crop_faces_combined(input_folder, output_folder, mtcnn_conf_thresh=0.5, yolov5_conf_thresh=0.1)
+    crop_faces_combined(input_folder, output_folder, mtcnn_conf_thresh=0.7, yolov5_conf_thresh=0.1)
+    # crop_faces_mtcnn(input_folder, output_folder, conf_thresh=0.7)
 
 def ok_get_root() -> None:
     r = requests.get(f"{BASE}/")

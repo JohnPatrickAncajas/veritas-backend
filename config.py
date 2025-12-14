@@ -4,8 +4,7 @@ import torch
 # -----------------------------
 # Model path (models folder)
 # -----------------------------
-# VERITAS_MODEL_PATH = os.path.join(os.path.dirname(__file__), "models/efficientnet_faces.pth")
-VERITAS_MODEL_PATH = os.path.join(os.path.dirname(__file__), "models/efficientnet_faces_old.pth")
+VERITAS_MODEL_PATH = os.path.join(os.path.dirname(__file__), r"models\efficientnet_faces_vers_dec14_best.pth")
 VERITAS_MODEL_VARIANT = "efficientnet-b0"
 
 FACE_2D_MODEL_PATH = os.path.join(os.path.dirname(__file__), "models/yolov5s_anime.pt")
@@ -18,6 +17,11 @@ HUMAN_FACE_DEVICE = "CPU:0"   # or "GPU:0" if you use GPU
 # Classes
 # -----------------------------
 CLASSES = ["2d", "3d", "ai", "real"]
+
+# -----------------------------
+# Model hyperparameters
+# -----------------------------
+DROPOUT_RATE = 0.5  # Must match training configuration
 
 # -----------------------------
 # Device

@@ -34,7 +34,7 @@ app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024  # 2MB max file size
 # -------------------------------------------------------
 # Model config
 # -------------------------------------------------------
-from config import VERITAS_MODEL_PATH, DEVICE, VERITAS_MODEL_VARIANT, CLASSES as CLASS_NAMES, FACE_2D_MODEL_PATH, FACE_2D_MODEL_CONF_THR
+from config import VERITAS_MODEL_PATH, DEVICE, VERITAS_MODEL_VARIANT, CLASSES as CLASS_NAMES, FACE_2D_MODEL_PATH, FACE_2D_MODEL_CONF_THR, DROPOUT_RATE
 
 NUM_CLASSES = len(CLASS_NAMES)
 device = DEVICE
@@ -45,7 +45,11 @@ log.info(f"Using device: {device}")
 # -------------------------------------------------------
 def build_model(num_classes=NUM_CLASSES):
     model = EfficientNet.from_name(VERITAS_MODEL_VARIANT)
-    model._fc = nn.Linear(model._fc.in_features, num_classes)
+    # Match the training architecture with dropout
+    model._fc = nn.Sequential(
+        nn.Dropout(p=0.5),  # Must match DROPOUT_RATE from training
+        nn.Linear(model._fc.in_features, num_classes)
+    )
     return model
 
 def load_state_dict_safe(model, state_path):
